@@ -1,13 +1,14 @@
 #pragma once
 #include "pch.h"
 
-namespace Sharingway {
-
-    // Debug logging system
+namespace Sharingway {    // Debug logging system
     class SharingwayUtils {
     public:
         static bool DebugLogging;
         static void DebugLog(const std::string& message, const std::string& component = "Sharingway");
+        
+        // Utility functions to match C# implementation
+        static bool EnsureRegistryInitialized();
     };
 
     // Forward declarations
