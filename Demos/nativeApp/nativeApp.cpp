@@ -8,6 +8,14 @@
 
 using namespace Sharingway;
 
+// Enable debug logging for C++ demo
+bool enableDebugLogging() {
+    SharingwayUtils::DebugLogging = true;
+    SharingwayUtils::DebugLog("C++ demo application starting with debug logging enabled", "NativeApp");
+    return true;
+}
+static bool debugInitialized = enableDebugLogging();
+
 // Forward declarations
 void TestReadOperation(const std::string& providerName);
 

@@ -3,6 +3,13 @@
 
 namespace Sharingway {
 
+    // Debug logging system
+    class SharingwayUtils {
+    public:
+        static bool DebugLogging;
+        static void DebugLog(const std::string& message, const std::string& component = "Sharingway");
+    };
+
     // Forward declarations
     class RegistryManager;
     class Provider;

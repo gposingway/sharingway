@@ -11,6 +11,13 @@ using Sharingway.Net;
 [SupportedOSPlatform("windows")]
 class Program
 {
+    // Enable debug logging for monitor application
+    static Program()
+    {
+        SharingwayUtils.DebugLogging = true;
+        SharingwayUtils.DebugLog("Monitor application starting with debug logging enabled", "Monitor");
+    }
+
     private static readonly Dictionary<string, ProviderMonitor> _providerMonitors = new();
     private static readonly Dictionary<string, ProviderStats> _providerStats = new();
     private static readonly object _monitorsLock = new();
@@ -91,11 +98,20 @@ class Program
         }
         
         while (_running)
-        {
-            try
+        {            try
             {
                 // Get current providers from registry
                 var currentProviders = subscriber.GetAvailableProviders();
+                
+                // Debug: Show what we got from GetAvailableProviders
+                if (currentProviders.Count > 0)
+                {
+                    Console.WriteLine($"🔍 [{DateTime.Now:HH:mm:ss.fff}] Found {currentProviders.Count} providers:");
+                    foreach (var provider in currentProviders)
+                    {
+                        Console.WriteLine($"    - {provider.Name} ({provider.Status})");
+                    }
+                }
                 
                 lock (_monitorsLock)
                 {

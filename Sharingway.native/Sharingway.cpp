@@ -5,6 +5,15 @@
 
 namespace Sharingway {
 
+    // Debug logging system implementation
+    bool SharingwayUtils::DebugLogging = false;
+
+    void SharingwayUtils::DebugLog(const std::string& message, const std::string& component) {
+        if (DebugLogging) {
+            std::cout << "[" << component << "] [DEBUG] " << message << std::endl;
+        }
+    }
+
     // Utility functions implementation
     std::string GetProviderMmfName(const std::string& provider) {
         return "Global\\Sharingway." + provider;

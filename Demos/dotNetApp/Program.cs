@@ -16,6 +16,10 @@ namespace SharingwayDemo
             Console.WriteLine("Sharingway .NET Demo Application");
             Console.WriteLine("================================");
             
+            // Enable debug logging for comprehensive testing
+            SharingwayUtils.DebugLogging = true;
+            SharingwayUtils.DebugLog("Debug logging enabled", "DotNetApp");
+            
             if (args.Length > 0)
             {
                 switch (args[0].ToLower())

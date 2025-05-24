@@ -148,24 +148,37 @@ namespace Sharingway.Net
             return _subscriptions.Keys.ToList();
         }        public List<ProviderInfo> GetAvailableProviders()
         {
+            SharingwayUtils.DebugLog($"Subscriber.GetAvailableProviders() called, _registry is {(_registry != null ? "not null" : "null")}", "Subscriber");
             try
             {
                 if (_registry != null)
                 {
-                    return _registry.GetRegistry();
+                    SharingwayUtils.DebugLog("Using existing registry to get providers", "Subscriber");
+                    var providers = _registry.GetRegistry();
+                    SharingwayUtils.DebugLog($"Registry returned {providers.Count} providers", "Subscriber");
+                    return providers;
                 }
                 else
                 {
+                    SharingwayUtils.DebugLog("Creating temporary registry connection", "Subscriber");
                     // Try to create a temporary registry connection
                     using var tempRegistry = new RegistryManager();
                     if (tempRegistry.Initialize())
                     {
-                        return tempRegistry.GetRegistry();
+                        SharingwayUtils.DebugLog("Temporary registry initialized successfully", "Subscriber");
+                        var providers = tempRegistry.GetRegistry();
+                        SharingwayUtils.DebugLog($"Temporary registry returned {providers.Count} providers", "Subscriber");
+                        return providers;
+                    }
+                    else
+                    {
+                        SharingwayUtils.DebugLog("Failed to initialize temporary registry", "Subscriber");
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                Console.WriteLine($"[DEBUG] Exception in GetAvailableProviders: {ex.Message}");
                 // Ignore errors and return empty list
             }
 

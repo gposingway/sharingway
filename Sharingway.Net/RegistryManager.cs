@@ -209,24 +209,51 @@ namespace Sharingway.Net
                 _registrySync?.Unlock();
                 return false;
             }
-        }
-
-        public List<ProviderInfo> GetRegistry()
+        }        public List<ProviderInfo> GetRegistry()
         {
+            SharingwayUtils.DebugLog("RegistryManager.GetRegistry() called", "Registry");
             var providers = new List<ProviderInfo>();
 
-            if (_registrySync?.Lock(5000) != true) return providers;
+            if (_registrySync?.Lock(5000) != true) 
+            {
+                SharingwayUtils.DebugLog("Failed to acquire registry lock", "Registry");
+                return providers;
+            }
 
             try
             {
+                SharingwayUtils.DebugLog("Registry lock acquired, getting internal registry", "Registry");
                 var registry = GetRegistryInternal();
-
-                foreach (var kvp in registry)
+                SharingwayUtils.DebugLog($"Internal registry returned {registry.Count} entries", "Registry");                foreach (var kvp in registry)
                 {
                     var name = kvp.Key;
-                    var info = kvp.Value as Dictionary<string, object>;
+                    SharingwayUtils.DebugLog($"Processing provider entry: {name}", "Registry");
+                    SharingwayUtils.DebugLog($"Raw value type: {kvp.Value?.GetType()?.Name ?? "null"}", "Registry");
+                    SharingwayUtils.DebugLog($"Raw value: {kvp.Value}", "Registry");
                     
-                    if (info == null) continue;
+                    Dictionary<string, object>? info = null;
+                    
+                    // Handle both JsonElement and Dictionary<string, object> types
+                    if (kvp.Value is JsonElement jsonElement && jsonElement.ValueKind == JsonValueKind.Object)
+                    {
+                        SharingwayUtils.DebugLog($"Converting JsonElement to Dictionary", "Registry");
+                        info = new Dictionary<string, object>();
+                        foreach (var property in jsonElement.EnumerateObject())
+                        {
+                            info[property.Name] = property.Value;
+                        }
+                    }
+                    else if (kvp.Value is Dictionary<string, object> dictValue)
+                    {
+                        SharingwayUtils.DebugLog($"Using existing Dictionary", "Registry");
+                        info = dictValue;
+                    }
+                    
+                    if (info == null) 
+                    {
+                        SharingwayUtils.DebugLog($"Provider {name} has null info, skipping", "Registry");
+                        continue;
+                    }
 
                     var provider = new ProviderInfo
                     {
@@ -235,6 +262,8 @@ namespace Sharingway.Net
                         Description = info.GetValueOrDefault("description")?.ToString() ?? "",
                         Capabilities = new List<string>()
                     };
+                    
+                    SharingwayUtils.DebugLog($"Provider {name} status: {provider.Status}", "Registry");
 
                     if (info.GetValueOrDefault("capabilities") is JsonElement capsElement && capsElement.ValueKind == JsonValueKind.Array)
                     {
@@ -258,17 +287,18 @@ namespace Sharingway.Net
                     if (lastHeartbeat is JsonElement lhElement && lhElement.ValueKind == JsonValueKind.Number)
                     {
                         provider.LastHeartbeat = SharingwayUtils.FromUnixTimestamp(lhElement.GetInt64());
-                    }
-
-                    providers.Add(provider);
+                    }                    providers.Add(provider);
+                    SharingwayUtils.DebugLog($"Added provider to list: {provider.Name}", "Registry");
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                SharingwayUtils.DebugLog($"Exception in GetRegistry: {ex.Message}", "Registry");
                 // Error reading registry
             }
 
             _registrySync.Unlock();
+            SharingwayUtils.DebugLog($"GetRegistry returning {providers.Count} providers", "Registry");
             return providers;
         }
 
@@ -278,20 +308,26 @@ namespace Sharingway.Net
             {
                 _onRegistryChanged = handler;
             }
-        }
-
-        private Dictionary<string, object> GetRegistryInternal()
+        }        private Dictionary<string, object> GetRegistryInternal()
         {
+            SharingwayUtils.DebugLog("GetRegistryInternal() called", "Registry");
             var registry = new Dictionary<string, object>();
 
             if (_registryMmf?.ReadJson(out var data) == true && data.ValueKind == JsonValueKind.Object)
             {
+                SharingwayUtils.DebugLog("Registry MMF read successful, parsing JSON", "Registry");
                 foreach (var property in data.EnumerateObject())
                 {
                     registry[property.Name] = property.Value;
+                    SharingwayUtils.DebugLog($"Found registry entry: {property.Name}", "Registry");
                 }
             }
+            else
+            {
+                SharingwayUtils.DebugLog("Registry MMF read failed or data is not JSON object", "Registry");
+            }
 
+            SharingwayUtils.DebugLog($"GetRegistryInternal returning {registry.Count} entries", "Registry");
             return registry;
         }
 

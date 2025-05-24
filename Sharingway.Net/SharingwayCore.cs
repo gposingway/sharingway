@@ -321,6 +321,23 @@ namespace Sharingway.Net
     {
         public const long DefaultMmfSize = 1024 * 1024; // 1MB
         public const string RegistryName = "Global\\Sharingway.Registry";
+        
+        /// <summary>
+        /// Global debug flag for Sharingway framework logging
+        /// </summary>
+        public static bool DebugLogging { get; set; } = false;
+        
+        /// <summary>
+        /// Helper method for debug logging with consistent formatting
+        /// </summary>
+        public static void DebugLog(string message, string? component = null)
+        {
+            if (DebugLogging)
+            {
+                var prefix = component != null ? $"[{component}]" : "[Sharingway]";
+                Console.WriteLine($"{prefix} [DEBUG] {message}");
+            }
+        }
 
         public static string GetProviderMmfName(string provider) => $"Global\\Sharingway.{provider}";
         public static string GetProviderMutexName(string provider) => $"Global\\Sharingway.{provider}.Lock";
