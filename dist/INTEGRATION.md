@@ -30,3 +30,4 @@ This distribution contains pre-built libraries and headers for easy integration.
 3. Link against Sharingway.native.lib
 
 See docs/README.md for detailed integration instructions.
+See docs/AI_ASSISTANT_GUIDE.md for AI assistant integration help.

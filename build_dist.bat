@@ -70,6 +70,7 @@ copy "Sharingway.native\x64\%CONFIG%\Sharingway.native.pdb" "%DIST_DIR%\cpp\lib\
 echo Copying documentation...
 copy "README.md" "%DIST_DIR%\docs\README.md" > nul
 copy "Demos\README.md" "%DIST_DIR%\docs\DEMOS.md" > nul
+copy "AI_ASSISTANT_GUIDE.md" "%DIST_DIR%\docs\AI_ASSISTANT_GUIDE.md" > nul
 copy "LICENSE" "%DIST_DIR%\docs\LICENSE" > nul 2>nul
 
 :: Create integration guide
@@ -107,6 +108,7 @@ echo 2. Copy `cpp/lib/x64/Sharingway.native.lib` to your library path
 echo 3. Link against Sharingway.native.lib
 echo.
 echo See docs/README.md for detailed integration instructions.
+echo See docs/AI_ASSISTANT_GUIDE.md for AI assistant integration help.
 ) > "%DIST_DIR%\INTEGRATION.md"
 
 :: Create version info
@@ -157,5 +159,6 @@ echo   C++: %DIST_DIR%\cpp\lib\x64\Sharingway.native.lib
 echo.
 echo See %DIST_DIR%\INTEGRATION.md for quick start instructions.
 echo See %DIST_DIR%\docs\README.md for detailed documentation.
+echo See %DIST_DIR%\docs\AI_ASSISTANT_GUIDE.md for AI assistant help.
 echo.
 pause

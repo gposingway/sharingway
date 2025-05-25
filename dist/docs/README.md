@@ -1299,6 +1299,199 @@ cd Demos
 dotnet run --project monitorApp
 ```
 
+## 🤖 For AI Assistants & Agentic Clients
+
+### AI Agent Integration Guide
+
+This section provides specific instructions for AI assistants (Claude, GPT-4, etc.) to help developers integrate Sharingway into their projects.
+
+#### Quick Assessment Questions
+
+When helping a developer, first determine:
+
+1. **Programming Language**: C++ or C#?
+2. **Project Type**: Game plugin, desktop app, service, etc.?
+3. **Development Environment**: Visual Studio, VS Code, other?
+4. **Target Platform**: Windows version and architecture
+
+#### Step-by-Step Integration Process
+
+##### 1. Guide Repository Cloning
+
+```powershell
+# Instruct the developer to clone and prepare the distribution
+git clone https://github.com/yourusername/sharingway.git
+cd sharingway
+
+# Build the distribution package
+.\build_dist.bat
+# OR for PowerShell users: .\build_dist.ps1
+```
+
+##### 2. Distribution Content Analysis
+
+After building, the `dist/` folder contains:
+
+```
+dist/
+├── csharp/                     # For C# projects
+│   ├── Sharingway.Net.dll     # Main library (.NET 9.0)
+│   └── Sharingway.Net.pdb     # Debug symbols
+├── cpp/                        # For C++ projects
+│   ├── include/               # Header files
+│   │   ├── Sharingway.h       # Main API header
+│   │   └── json.hpp           # JSON library
+│   └── lib/x64/               # Pre-compiled libraries
+│       ├── Sharingway.native.lib  # Link library
+│       └── Sharingway.native.pdb  # Debug symbols
+├── docs/                       # Documentation
+│   ├── README.md              # Integration guide
+│   ├── DEMOS.md               # Demo documentation
+│   └── LICENSE                # License file
+├── INTEGRATION.md              # Quick integration steps
+└── VERSION.txt                 # Version information
+```
+
+##### 3. Language-Specific Integration Guidance
+
+**For C# Projects:**
+
+```csharp
+// Guide developers to:
+// 1. Copy dist/csharp/Sharingway.Net.dll to their project
+// 2. Add reference in .csproj:
+<PackageReference Include="Sharingway.Net" Version="1.0.0" />
+// OR
+<Reference Include="Sharingway.Net">
+  <HintPath>path\to\Sharingway.Net.dll</HintPath>
+</Reference>
+
+// 3. Basic usage pattern:
+using Sharingway.Net;
+
+// Provider example
+var provider = new Provider("MyAppProvider", "My Application Data");
+provider.Initialize();
+provider.PublishData(jsonData);
+
+// Subscriber example  
+var subscriber = new Subscriber();
+subscriber.Initialize();
+subscriber.SetDataUpdateHandler((providerName, data) => {
+    Console.WriteLine($"Received from {providerName}: {data}");
+});
+subscriber.SubscribeTo("TargetProvider");
+```
+
+**For C++ Projects:**
+
+```cpp
+// Guide developers to:
+// 1. Copy dist/cpp/include/*.h to project include path
+// 2. Copy dist/cpp/lib/x64/*.lib to project library path
+// 3. Add to project settings:
+//    - Include Directories: path\to\dist\cpp\include
+//    - Library Directories: path\to\dist\cpp\lib\x64
+//    - Additional Dependencies: Sharingway.native.lib
+
+// 4. Basic usage pattern:
+#include "Sharingway.h"
+
+// Provider example
+Sharingway::Provider provider("MyAppProvider", "My Application Data");
+provider.Initialize();
+provider.PublishData(jsonString);
+
+// Subscriber example
+Sharingway::Subscriber subscriber;
+subscriber.Initialize();
+subscriber.SetDataUpdateHandler([](const std::string& provider, const std::string& data) {
+    std::cout << "Received from " << provider << ": " << data << std::endl;
+});
+subscriber.SubscribeTo("TargetProvider");
+```
+
+##### 4. Project Type Specific Guidance
+
+**Game Engine Plugins (Dalamud, ReShade):**
+- Use the C# version for Dalamud plugins
+- Use the C++ version for ReShade addons
+- Consider memory usage in game contexts
+- Test thoroughly to avoid game crashes
+
+**Desktop Applications:**
+- Either C# or C++ depending on existing codebase
+- Consider UI thread safety for data updates
+- Implement proper disposal patterns
+
+**Windows Services:**
+- Use C++ for system services
+- Ensure proper service lifecycle management
+- Handle service restart scenarios
+
+##### 5. Verification Steps
+
+Guide the developer to test integration:
+
+```powershell
+# Run the demo applications to verify Sharingway is working
+cd Demos
+.\run_all_demos.bat
+
+# Look for:
+# 1. Monitor showing detected providers
+# 2. Cross-communication between C# and C++ demos
+# 3. Real-time message counting
+```
+
+##### 6. Common Integration Patterns
+
+**Pattern 1: Data Broadcasting**
+```csharp
+// One provider, multiple subscribers
+// Use when: Sharing sensor data, game state, etc.
+```
+
+**Pattern 2: Request-Response**
+```csharp
+// Provider responds to specific data requests
+// Use when: API-like communication needed
+```
+
+**Pattern 3: Event Broadcasting**
+```csharp
+// Multiple providers, monitoring subscriber
+// Use when: Collecting metrics, logging, monitoring
+```
+
+#### Troubleshooting for AI Assistants
+
+When developers report issues, check:
+
+1. **Build Issues**: Verify Visual Studio 2022 + .NET 9.0 SDK
+2. **Runtime Issues**: Check Windows permissions and admin rights
+3. **Integration Issues**: Verify correct dist/ folder contents used
+4. **Communication Issues**: Ensure providers are running before subscribers
+
+#### Quick Reference for AI Assistants
+
+```yaml
+# Key file locations after build_dist.bat:
+csharp_lib: "dist/csharp/Sharingway.Net.dll"
+cpp_headers: "dist/cpp/include/Sharingway.h" 
+cpp_lib: "dist/cpp/lib/x64/Sharingway.native.lib"
+integration_guide: "dist/INTEGRATION.md"
+examples: "Demos/"
+
+# Essential namespaces/headers:
+csharp_namespace: "Sharingway.Net"
+cpp_header: "#include \"Sharingway.h\""
+
+# Core classes:
+provider_class: "Provider" 
+subscriber_class: "Subscriber"
+```
+
 ## 🛠️ Troubleshooting
 
 ### Common Issues
