@@ -47,7 +47,10 @@ Sharingway/
 # Clone and build distribution
 git clone https://github.com/yourusername/sharingway.git
 cd sharingway
+
+# Create distribution package
 build_dist.bat
+# OR: .\build_dist.ps1
 ```
 
 The `dist/` folder will contain everything you need for integration.
@@ -95,7 +98,12 @@ The easiest way to integrate Sharingway into your project:
 
 ```cmd
 # From the root Sharingway directory
+
+# Using batch file (Windows Command Prompt)
 build_dist.bat
+
+# OR using PowerShell
+.\build_dist.ps1
 ```
 
 This creates a `dist/` folder with:
@@ -496,12 +504,12 @@ This creates a `dist/` folder containing:
    ```cmd
    git clone https://github.com/yourusername/sharingway.git
    cd sharingway
-   
-   # Build all projects
+     # Build all projects
    msbuild Sharingway.sln /p:Configuration=Release /p:Platform=x64
    
    # Or create distribution package
    build_dist.bat
+   # OR: .\build_dist.ps1
    ```
 
 ### Production Deployment

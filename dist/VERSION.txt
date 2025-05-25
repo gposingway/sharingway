@@ -1,0 +1,25 @@
+# Sharingway IPC Framework - Distribution
+
+**Build Date:** Sat 05/24/2025 21:01:41.17
+**Configuration:** Release
+**Platform:** x64
+
+## Library Files
+
+### C# (.NET)
+- Sharingway.Net.dll - Main library
+- Sharingway.Net.pdb - Debug symbols
+
+### C++
+- Sharingway.h - Main header file
+- json.hpp - JSON library (nlohmann/json)
+- Sharingway.native.lib - Static library (x64)
+- Sharingway.native.pdb - Debug symbols
+
+## System Requirements
+
+- Windows 10 (1809+) or Windows 11
+- Visual C++ Redistributable 2022 (for C++ apps)
+- .NET 9.0 Runtime (for C# apps)
+
+For development, see docs/README.md for full requirements.
