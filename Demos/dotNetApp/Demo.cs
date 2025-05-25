@@ -10,25 +10,30 @@ namespace SharingwayDemo
 {
     [SupportedOSPlatform("windows")]
     class Demo
-    {
-        // Shared state flags and monitoring variables
+    {        // Shared state flags and monitoring variables
         private static readonly CancellationTokenSource CancellationSource = new();
         private static readonly Random Random = new();
         private static readonly object ConsoleLock = new();
         private static bool _isRunning = true;
-        private static int _receivedMessageCount = 0;
+          // Tracking state
+        private static int _messagesSent = 0;
+        private static int _messagesReceived = 0;
+        private static readonly Dictionary<string, int> _messagesReceivedByProvider = new();
+        private static string _lastReceivedData = "";
+        private static string _lastReceivedFrom = "";
+        private static DateTime _lastReceivedTime = DateTime.MinValue;
+        private static string _currentProviderName = "";
 
         public static async Task RunDemo(string[] args)
         {
             Console.WriteLine("Sharingway .NET Demo Application");
             Console.WriteLine("================================");
-            
-            // Enable debug logging for better diagnostics
-            SharingwayUtils.DebugLogging = true;
+              // Enable debug logging for better diagnostics
+            SharingwayUtils.DebugLogging = true;  // Enable debug logging
             SharingwayUtils.DebugLog("DotNetApp starting with debug logging enabled", "DotNetApp");
-            
-            // Get provider name from command line or use default
+              // Get provider name from command line or use default
             string providerName = args.Length > 0 ? args[0] : "DotNetProvider";
+            _currentProviderName = providerName;
             
             Console.WriteLine($"Starting with provider name: {providerName}");
             Console.WriteLine("This application runs as both provider and subscriber simultaneously");
@@ -118,13 +123,13 @@ namespace SharingwayDemo
                             }
                         }
                     };
-                    
-                    // Publish the data
+                      // Publish the data
                     provider.PublishData(data);
                     
                     lock (ConsoleLock)
                     {
-                        Console.WriteLine($"[PROVIDER] Published message {messageId-1} from {providerName}");
+                        _messagesSent++;
+                        Console.WriteLine($"Message Sent #{_messagesSent}");
                     }
                     
                     // Wait a bit before publishing next data
@@ -140,8 +145,7 @@ namespace SharingwayDemo
                 Console.WriteLine($"[PROVIDER] Fatal error: {ex.Message}");
             }
         }
-        
-        private static async Task RunSubscriber(CancellationToken cancellationToken)
+          private static async Task RunSubscriber(CancellationToken cancellationToken)
         {
             try
             {
@@ -159,22 +163,23 @@ namespace SharingwayDemo
                 
                 // Set up provider change events
                 subscriber.SetProviderChangeHandler(OnProviderChange);
-                  // Get available providers
+                
+                // Get available providers and subscribe (but not to ourselves)
                 var providers = subscriber.GetAvailableProviders();
-                Console.WriteLine($"Found {providers.Count} active providers:");
-                foreach (var provider in providers)
+                if (providers.Count > 0)
                 {
-                    Console.WriteLine($"  - {provider.Name}");
-                    Console.WriteLine("    Attempting to subscribe...");
-                    
-                    if (subscriber.SubscribeTo(provider.Name))
-                    {
-                        Console.WriteLine("    Successfully subscribed.");
+                    Console.WriteLine($"Found {providers.Count} providers, subscribing to others...");
+                    foreach (var provider in providers)
+                    {                        // Don't subscribe to our own provider
+                        if (provider.Name != _currentProviderName)
+                        {
+                            subscriber.SubscribeTo(provider.Name);
+                        }
                     }
-                    else
-                    {
-                        Console.WriteLine("    Failed to subscribe!");
-                    }
+                }
+                else
+                {
+                    Console.WriteLine("No providers found yet, will auto-subscribe to new ones...");
                 }
                 
                 // Keep running until cancelled
@@ -191,34 +196,85 @@ namespace SharingwayDemo
             {
                 Console.WriteLine($"[SUBSCRIBER] Fatal error: {ex.Message}");
             }
-        }
-        
-        private static void OnDataReceived(string providerName, JsonElement data)
-        {
-            Interlocked.Increment(ref _receivedMessageCount);
-            
-            lock (ConsoleLock) 
-            {
-                Console.WriteLine($"[SUBSCRIBER] Received data from {providerName}");
-                Console.WriteLine($"[SUBSCRIBER] Total messages received: {_receivedMessageCount}");
-                
-                // Pretty-print the data
-                var options = new JsonSerializerOptions { WriteIndented = true };
-                string formattedJson = JsonSerializer.Serialize(data, options);
-                Console.WriteLine(formattedJson);
-            }
-        }
-          private static void OnProviderChange(string providerName, ProviderStatus status)
+        }        private static void OnDataReceived(string providerName, JsonElement data)
         {
             lock (ConsoleLock)
             {
-                if (status == ProviderStatus.Online)
+                _messagesReceived++;
+                if (!_messagesReceivedByProvider.ContainsKey(providerName))
+                    _messagesReceivedByProvider[providerName] = 0;
+                _messagesReceivedByProvider[providerName]++;
+                
+                _lastReceivedData = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
+                _lastReceivedFrom = providerName;
+                _lastReceivedTime = DateTime.Now;
+                
+                // Clear screen and show current state
+                Console.Clear();
+                ShowCurrentState();
+            }
+        }
+
+        private static void ShowCurrentState()
+        {
+            Console.WriteLine("Sharingway .NET Demo - Current State");
+            Console.WriteLine("===================================");
+            Console.WriteLine();
+            
+            // Show summary statistics
+            Console.WriteLine("SUMMARY:");
+            Console.WriteLine($"  Messages Sent: {_messagesSent}");
+            Console.WriteLine($"  Messages Received: {_messagesReceived}");
+            
+            if (_messagesReceivedByProvider.Count > 0)
+            {
+                Console.WriteLine("  Received by Provider:");
+                foreach (var kvp in _messagesReceivedByProvider)
                 {
-                    Console.WriteLine($"[SUBSCRIBER] Provider '{providerName}' is now available");
+                    Console.WriteLine($"    {kvp.Key}: {kvp.Value} messages");
                 }
-                else
+            }
+            
+            Console.WriteLine();
+            Console.WriteLine(new string('=', 50));
+            Console.WriteLine();
+            
+            // Show last received message details
+            if (_messagesReceived > 0)
+            {
+                Console.WriteLine($"LAST RECEIVED MESSAGE:");
+                Console.WriteLine($"  From: {_lastReceivedFrom}");
+                Console.WriteLine($"  Time: {_lastReceivedTime:HH:mm:ss.fff}");
+                Console.WriteLine($"  Payload:");
+                Console.WriteLine();
+                
+                // Indent the JSON payload
+                var lines = _lastReceivedData.Split('\n');
+                foreach (var line in lines)
                 {
-                    Console.WriteLine($"[SUBSCRIBER] Provider '{providerName}' is no longer available");
+                    if (!string.IsNullOrWhiteSpace(line))
+                        Console.WriteLine($"    {line}");
+                }
+            }
+            else
+            {
+                Console.WriteLine("NO MESSAGES RECEIVED YET");
+                Console.WriteLine("Waiting for data from other providers...");
+            }
+            
+            Console.WriteLine();
+            Console.WriteLine(new string('=', 50));
+            Console.WriteLine("Press 'q' to quit");
+        }        private static void OnProviderChange(string providerName, ProviderStatus status)
+        {
+            lock (ConsoleLock)
+            {
+                Console.WriteLine($"[DEBUG] Provider change event: {providerName}, status: {status}");
+                
+                if (status == ProviderStatus.Online && providerName != _currentProviderName)
+                {
+                    Console.WriteLine($"New provider detected: {providerName}, should auto-subscribe");
+                    // TODO: Add auto-subscription logic here if needed
                 }
             }
         }
