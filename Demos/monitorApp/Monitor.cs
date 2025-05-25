@@ -14,7 +14,7 @@ class Monitor
     // Enable debug logging for monitor application
     static Monitor()
     {
-        SharingwayUtils.DebugLogging = true;
+        SharingwayUtils.DebugLogging = false;
         SharingwayUtils.DebugLog("Monitor application starting with debug logging enabled", "Monitor");
     }
 
@@ -23,18 +23,18 @@ class Monitor
     private static readonly Dictionary<string, ProviderStats> _providerStats = new();
     private static readonly object _monitorsLock = new();
     private static readonly object _statsLock = new();
-    
-    // Runtime control
+      // Runtime control
     private static volatile bool _running = true;
     private static int _messageCount = 0;
     private static int _totalMessageCount = 0;
     private static DateTime _startTime = DateTime.Now;
-    
-    // Display configuration
+    private static Subscriber? _globalSubscriber = null;  // Store subscriber reference for auto-subscription
+      // Display configuration
     private static bool _showDetailedJson = false;
     private static bool _showProviderList = true;
     private static bool _showMessageCount = true;
-    private static int _refreshRate = 1000; // ms
+    private static bool _showCommunicationMatrix = true;
+    private static int _refreshRate = 2000; // ms - slower to reduce spam
     
     // Store received data values for each provider
     private class ProviderMonitor
@@ -74,12 +74,11 @@ class Monitor
         public DateTime LastMessage { get; set; } = DateTime.Now;
         public double MessagesPerSecond { get; set; } = 0;
     }
-    
-    public static async Task RunMonitor(string[] args)
+      public static async Task RunMonitor(string[] args)
     {
-        Console.WriteLine("Sharingway Monitor Application");
-        Console.WriteLine("=============================");
-        Console.WriteLine("Monitoring all IPC activity on this system");
+        Console.WriteLine("Sharingway Demo Communication Monitor");
+        Console.WriteLine("====================================");
+        Console.WriteLine("Monitoring communication between demo applications");
         Console.WriteLine();
         Console.WriteLine("Press 'q' to quit, 'h' for help");
         Console.WriteLine();
@@ -135,9 +134,12 @@ class Monitor
             case ConsoleKey.P:
                 _showProviderList = !_showProviderList;
                 break;
-                
-            case ConsoleKey.M:
+                  case ConsoleKey.M:
                 _showMessageCount = !_showMessageCount;
+                break;
+                
+            case ConsoleKey.X:
+                _showCommunicationMatrix = !_showCommunicationMatrix;
                 break;
                 
             case ConsoleKey.Add:
@@ -163,23 +165,26 @@ class Monitor
                 break;
         }
     }
-    
-    private static void ShowHelp()
+      private static void ShowHelp()
     {
         Console.Clear();
-        Console.WriteLine("Sharingway Monitor Help");
-        Console.WriteLine("=====================");
+        Console.WriteLine("Sharingway Demo Communication Monitor Help");
+        Console.WriteLine("=========================================");
         Console.WriteLine();
         Console.WriteLine("Key Commands:");
         Console.WriteLine("  q - Quit the monitor application");
-        Console.WriteLine("  j - Toggle detailed JSON display");
+        Console.WriteLine("  j - Toggle detailed JSON display (off by default)");
         Console.WriteLine("  p - Toggle provider list display");
         Console.WriteLine("  m - Toggle message count display");
+        Console.WriteLine("  x - Toggle communication matrix view");
         Console.WriteLine("  + - Increase refresh rate (faster updates)");
         Console.WriteLine("  - - Decrease refresh rate (slower updates)");
         Console.WriteLine("  c - Clear the console");
         Console.WriteLine("  h - Show this help screen");
         Console.WriteLine("  s - Save current stats to file");
+        Console.WriteLine();
+        Console.WriteLine("Communication Matrix shows data flow between providers.");
+        Console.WriteLine("Look for arrows (-->) to see which demos are talking to each other.");
         Console.WriteLine();
         Console.WriteLine("Press any key to return to monitoring...");
         Console.ReadKey(true);
@@ -221,13 +226,13 @@ class Monitor
             Console.WriteLine($"Error saving stats: {ex.Message}");
             Thread.Sleep(2000);
         }
-    }
-      private static async Task StartMonitoring(CancellationToken cancellationToken)
+    }    private static async Task StartMonitoring(CancellationToken cancellationToken)
     {
         try
         {
             // Create a subscriber that monitors all providers
             var subscriber = new Subscriber();
+            _globalSubscriber = subscriber;  // Store for provider change handler
             
             if (!subscriber.Initialize())
             {
@@ -239,6 +244,22 @@ class Monitor
             subscriber.SetDataUpdateHandler(OnDataReceived);
             subscriber.SetProviderChangeHandler(OnProviderChange);
             
+            // Subscribe to all available providers
+            var providers = subscriber.GetAvailableProviders();
+            if (providers.Count > 0)
+            {
+                Console.WriteLine($"Monitor found {providers.Count} providers, subscribing to all...");
+                foreach (var provider in providers)
+                {
+                    subscriber.SubscribeTo(provider.Name);
+                    Console.WriteLine($"Monitor subscribed to: {provider.Name}");
+                }
+            }
+            else
+            {
+                Console.WriteLine("Monitor: No providers found yet, will auto-subscribe to new ones...");
+            }
+            
             // Stay alive until cancelled
             try
             {
@@ -247,12 +268,14 @@ class Monitor
             catch (OperationCanceledException)
             {
                 // Normal cancellation, clean up
+                _globalSubscriber = null;
                 subscriber.Dispose();
             }
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Fatal error in monitoring: {ex.Message}");
+            _globalSubscriber = null;
         }
     }
     
@@ -347,9 +370,7 @@ class Monitor
                 }
             }
         }
-    }
-    
-    private static void OnProviderChange(string providerName, ProviderStatus status)
+    }    private static void OnProviderChange(string providerName, ProviderStatus status)
     {
         lock (_monitorsLock)
         {
@@ -364,6 +385,14 @@ class Monitor
                         FirstSeen = DateTime.Now,
                         IsActive = true
                     };
+                    
+                    Console.WriteLine($"Monitor: New provider detected: {providerName}, auto-subscribing...");
+                    // Auto-subscribe to new provider
+                    if (_globalSubscriber != null)
+                    {
+                        _globalSubscriber.SubscribeTo(providerName);
+                        Console.WriteLine($"Monitor: Successfully subscribed to {providerName}");
+                    }
                 }
                 _providerMonitors[providerName].IsActive = true;
             }
@@ -404,8 +433,7 @@ class Monitor
             // Normal cancellation
         }
     }
-    
-    private static void RenderDisplay()
+      private static void RenderDisplay()
     {
         // Reset position and prepare for rendering
         Console.SetCursorPosition(0, 4);  // Position after the header
@@ -423,91 +451,169 @@ class Monitor
         {
             Console.WriteLine($"Runtime: {runTime.Hours:D2}:{runTime.Minutes:D2}:{runTime.Seconds:D2}  |  " +
                             $"Total Messages: {_totalMessageCount}  |  " +
-                            $"Current Rate: {messagesPerSec}/sec  |  " +
-                            $"Recent: {_messageCount}");
+                            $"Rate: {messagesPerSec}/sec");
             
             // Reset message count for next interval
             _messageCount = 0;
         }
         
-        Console.WriteLine(new string('-', Console.WindowWidth - 1));
+        Console.WriteLine(new string('═', Math.Min(Console.WindowWidth - 1, 60)));
         
-        // List of active providers
-        if (_showProviderList)
+        // Get active providers
+        List<ProviderMonitor> activeProviders;
+        List<ProviderStats> activeStats;
+        lock (_monitorsLock)
         {
-            Console.WriteLine("Active Providers:");
-            
-            List<ProviderMonitor> activeProviders;
-            lock (_monitorsLock)
-            {
-                activeProviders = _providerMonitors.Values
-                    .Where(p => p.IsActive)
-                    .OrderBy(p => p.Name)
-                    .ToList();
-            }
+            activeProviders = _providerMonitors.Values
+                .Where(p => p.IsActive)
+                .OrderBy(p => p.Name)
+                .ToList();
+        }
+        lock (_statsLock)
+        {
+            activeStats = _providerStats.Values.ToList();
+        }
+        
+        // Communication Matrix - Simple overview of data flow
+        if (_showCommunicationMatrix)
+        {
+            Console.WriteLine("Communication Status:");
+            Console.WriteLine();
             
             if (activeProviders.Count == 0)
             {
-                Console.WriteLine("  No active providers detected");
+                Console.WriteLine("  🔴 No providers active - Start the demo applications!");
             }
-            
-            foreach (var provider in activeProviders)
+            else if (activeProviders.Count == 1)
             {
-                // Get stats for this provider
-                string rateInfo = "";
-                lock (_statsLock)
+                var provider = activeProviders[0];
+                var stats = activeStats.FirstOrDefault(s => s.Name == provider.Name);
+                var msgInfo = stats != null ? $" ({stats.MessageCount} messages)" : "";
+                Console.WriteLine($"  🟡 Only 1 provider active: {provider.Name}{msgInfo}");
+                Console.WriteLine("     Start additional demo applications to see communication");
+            }
+            else
+            {
+                Console.WriteLine("  🟢 Multiple providers active - Communication possible!");
+                Console.WriteLine();
+                
+                // Show each provider and their message activity
+                foreach (var provider in activeProviders)
                 {
-                    if (_providerStats.TryGetValue(provider.Name, out var stats))
+                    var stats = activeStats.FirstOrDefault(s => s.Name == provider.Name);
+                    if (stats != null && stats.MessageCount > 0)
                     {
-                        rateInfo = $" | {stats.MessageCount} msgs ({stats.MessagesPerSecond:F1}/sec)";
+                        var timeSinceLastMsg = DateTime.Now - stats.LastMessage;
+                        var statusIcon = timeSinceLastMsg.TotalSeconds < 5 ? "🟢" : "🟡";
+                        var rateText = stats.MessagesPerSecond > 0 ? $"{stats.MessagesPerSecond:F1}/sec" : "idle";
+                        
+                        Console.WriteLine($"     {statusIcon} {provider.Name} --> Broadcasting data ({rateText})");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"     ⚪ {provider.Name} --> No data yet");
                     }
                 }
                 
-                // Show provider info with capabilities
-                string capabilities = string.Join(", ", provider.Capabilities);
-                if (string.IsNullOrEmpty(capabilities))
+                Console.WriteLine();
+                
+                // Show cross-communication summary
+                var sendingProviders = activeProviders.Where(p => 
+                    activeStats.Any(s => s.Name == p.Name && s.MessageCount > 0)).ToList();
+                    
+                if (sendingProviders.Count >= 2)
                 {
-                    capabilities = "(none)";
+                    Console.WriteLine("  📡 Inter-demo communication detected!");
+                    Console.WriteLine($"     {sendingProviders.Count} providers are broadcasting data");
+                    Console.WriteLine("     Each provider can receive data from others");
                 }
+                else if (sendingProviders.Count == 1)
+                {
+                    Console.WriteLine("  📤 One-way communication:");
+                    Console.WriteLine($"     {sendingProviders[0].Name} is sending data");
+                    Console.WriteLine("     Other providers should be receiving it");
+                }
+            }
+        }
+        
+        Console.WriteLine();
+        Console.WriteLine(new string('─', Math.Min(Console.WindowWidth - 1, 60)));
+        
+        // Detailed provider list (simplified)
+        if (_showProviderList && activeProviders.Count > 0)
+        {
+            Console.WriteLine("Provider Details:");
+            
+            foreach (var provider in activeProviders)
+            {
+                var stats = activeStats.FirstOrDefault(s => s.Name == provider.Name);
+                var msgCount = stats?.MessageCount ?? 0;
+                var lastSeen = provider.LastSeen;
+                var timeSinceLastSeen = DateTime.Now - lastSeen;
                 
-                TimeSpan activeTime = DateTime.Now - provider.FirstSeen;
+                // Simple one-line summary per provider
+                var statusIcon = timeSinceLastSeen.TotalSeconds < 3 ? "🔥" : 
+                               timeSinceLastSeen.TotalSeconds < 10 ? "✅" : "💤";
+                               
+                Console.WriteLine($"  {statusIcon} {provider.Name}: {msgCount} messages sent");
                 
-                Console.WriteLine($"  {provider.Name} - {provider.Description}{rateInfo}");
-                Console.WriteLine($"    Capabilities: {capabilities}");
-                Console.WriteLine($"    Active for: {activeTime.Hours:D2}:{activeTime.Minutes:D2}:{activeTime.Seconds:D2}");
-                
-                // Show recent data if detailed mode is enabled
+                // Show recent data only if detailed mode is on and there's recent data
                 if (_showDetailedJson && provider.RecentData.Count > 0)
                 {
                     var lastData = provider.RecentData.Last();
                     
                     try
                     {
-                        // Try to format the JSON for better display
                         using JsonDocument doc = JsonDocument.Parse(lastData.Data);
-                        var options = new JsonSerializerOptions { WriteIndented = true };
-                        string formattedJson = JsonSerializer.Serialize(doc.RootElement, options);
                         
-                        Console.WriteLine("    Latest data:");
-                        foreach (string line in formattedJson.Split('\n'))
+                        // Just show a compact summary instead of full JSON
+                        var summary = "";
+                        if (doc.RootElement.ValueKind == JsonValueKind.Object)
                         {
-                            Console.WriteLine($"      {line}");
+                            var props = doc.RootElement.EnumerateObject().Take(3).ToList();
+                            summary = string.Join(", ", props.Select(p => $"{p.Name}:{GetValueSummary(p.Value)}"));
+                            if (doc.RootElement.EnumerateObject().Count() > 3)
+                                summary += "...";
                         }
+                        else
+                        {
+                            summary = GetValueSummary(doc.RootElement);
+                        }
+                        
+                        Console.WriteLine($"     Latest: {summary}");
                     }
                     catch (JsonException)
                     {
-                        // If not valid JSON, show raw data
-                        string displayData = lastData.Data.Length > 60 ? lastData.Data.Substring(0, 57) + "..." : lastData.Data;
-                        Console.WriteLine($"    Latest data: {displayData}");
+                        string displayData = lastData.Data.Length > 40 ? 
+                            lastData.Data.Substring(0, 37) + "..." : lastData.Data;
+                        Console.WriteLine($"     Latest: {displayData}");
                     }
                 }
-                
-                Console.WriteLine();
             }
         }
         
+        // Clear any remaining lines from previous renders
+        for (int i = 0; i < 5; i++)
+        {
+            Console.WriteLine(new string(' ', Math.Min(Console.WindowWidth - 1, 80)));
+        }
+        
         // Help reminder at the bottom
-        Console.WriteLine(new string('-', Console.WindowWidth - 1));
-        Console.WriteLine("Press 'q' to quit, 'h' for help");
+        Console.WriteLine();
+        Console.WriteLine("Press 'h' for help | 'x' to toggle communication matrix | 'j' for detailed data");
+    }
+    
+    private static string GetValueSummary(JsonElement element)
+    {
+        return element.ValueKind switch
+        {
+            JsonValueKind.String => $"\"{element.GetString()}\"",
+            JsonValueKind.Number => element.ToString(),
+            JsonValueKind.True => "true",
+            JsonValueKind.False => "false",
+            JsonValueKind.Array => $"[{element.GetArrayLength()} items]",
+            JsonValueKind.Object => "{...}",
+            _ => element.ToString()
+        };
     }
 }
